@@ -41,10 +41,10 @@ pip install -e .
 ### Install Dependencies
 
 ```bash
-pip install torch>=2.0.0 numpy>=1.21.0 einops>=0.6.0
-pip install datasets>=2.0.0 transformers>=4.20.0
-pip install wandb>=0.13.0 tqdm>=4.64.0
-pip install matplotlib>=3.5.0 seaborn>=0.11.0 scikit-learn>=1.1.0
+pip install torch numpy einops
+pip install datasets transformers
+pip install wandb tqdm
+pip install matplotlib seaborn scikit-learn
 ```
 
 ### Development Installation
