@@ -19,7 +19,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler
+from torch.amp import autocast
 
 import wandb
 from tqdm import tqdm
@@ -62,7 +63,7 @@ class TrainingConfig:
     
     # Mixed precision
     use_amp: bool = True
-    amp_dtype: str = "float16"  # or "bfloat16"
+    amp_dtype: str = "bfloat16"  # or "float16"
     
     # Regularization
     dropout: float = 0.1
@@ -89,7 +90,7 @@ class TrainingConfig:
     
     # System
     device: str = "cuda"
-    num_workers: int = 4
+    num_workers: int = 8
     pin_memory: bool = True
     compile_model: bool = True
     
@@ -318,6 +319,7 @@ class SpectralSSMTrainer:
             shuffle=(train_sampler is None),
             num_workers=self.config.num_workers,
             pin_memory=self.config.pin_memory,
+            persistent_workers=True,
             drop_last=True,
         )
         
@@ -328,6 +330,7 @@ class SpectralSSMTrainer:
             shuffle=False,
             num_workers=self.config.num_workers,
             pin_memory=self.config.pin_memory,
+            persistent_workers=True,
             drop_last=False,
         )
         
@@ -342,7 +345,7 @@ class SpectralSSMTrainer:
         labels = batch['labels'].to(self.device, non_blocking=True)
         
         # Forward pass with mixed precision
-        with autocast(enabled=self.config.use_amp):
+        with autocast('cuda', enabled=self.config.use_amp, dtype=torch.bfloat16 if self.config.amp_dtype == "bfloat16" else torch.float16):
             outputs = self.model(input_ids=input_ids, labels=labels)
             loss = outputs['loss']
             
@@ -397,7 +400,7 @@ class SpectralSSMTrainer:
                 input_ids = batch['input_ids'].to(self.device, non_blocking=True)
                 labels = batch['labels'].to(self.device, non_blocking=True)
                 
-                with autocast(enabled=self.config.use_amp):
+                with autocast('cuda', enabled=self.config.use_amp, dtype=torch.bfloat16 if self.config.amp_dtype == "bfloat16" else torch.float16):
                     outputs = self.model(input_ids=input_ids, labels=labels)
                     loss = outputs['loss']
                     logits = outputs['logits']
@@ -478,6 +481,10 @@ class SpectralSSMTrainer:
         """Main training loop"""
         self.log_info("Starting training...")
         
+        # Clear GPU cache before training
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
         # Create save directory
         os.makedirs(self.config.save_dir, exist_ok=True)
         
@@ -545,6 +552,10 @@ class SpectralSSMTrainer:
         self.save_checkpoint()
         
         self.log_info("Training completed!")
+        
+        # Clear GPU cache after training
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         
         if self.config.local_rank == 0:
             wandb.finish()

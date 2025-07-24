@@ -11,16 +11,31 @@ from typing import Tuple, Optional
 
 def real_fft(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     """Real FFT with proper normalization for spectral analysis"""
+    # Convert bfloat16 to float32 for FFT operations
+    if x.dtype == torch.bfloat16:
+        x = x.float()
+        result = torch.fft.rfft(x, dim=dim, norm='ortho')
+        return result.to(torch.bfloat16)
     return torch.fft.rfft(x, dim=dim, norm='ortho')
 
 
 def real_ifft(x: torch.Tensor, n: Optional[int] = None, dim: int = -1) -> torch.Tensor:
     """Inverse real FFT with proper normalization"""
+    # Convert bfloat16 to float32 for FFT operations
+    if x.dtype == torch.bfloat16:
+        x = x.float()
+        result = torch.fft.irfft(x, n=n, dim=dim, norm='ortho')
+        return result.to(torch.bfloat16)
     return torch.fft.irfft(x, n=n, dim=dim, norm='ortho')
 
 
 def dct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     """Discrete Cosine Transform using FFT implementation"""
+    # Convert bfloat16 to float32 for FFT operations
+    original_dtype = x.dtype
+    if x.dtype == torch.bfloat16:
+        x = x.float()
+    
     N = x.size(dim)
     x_pad = torch.cat([x, x.flip(dims=[dim])], dim=dim)
     
@@ -39,11 +54,19 @@ def dct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
         W = W.view(shape)
         X = X * W
     
-    return X.real
+    result = X.real
+    if original_dtype == torch.bfloat16:
+        result = result.to(torch.bfloat16)
+    return result
 
 
 def idct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     """Inverse Discrete Cosine Transform"""
+    # Convert bfloat16 to float32 for FFT operations
+    original_dtype = x.dtype
+    if x.dtype == torch.bfloat16:
+        x = x.float()
+    
     N = x.size(dim)
     
     # Create frequency scaling
@@ -71,7 +94,10 @@ def idct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
         X_ext = X_ext.transpose(dim, -1)
     
     result = torch.fft.ifft(X_ext, dim=dim).real
-    return result.narrow(dim, 0, N) * 2
+    result = result.narrow(dim, 0, N) * 2
+    if original_dtype == torch.bfloat16:
+        result = result.to(torch.bfloat16)
+    return result
 
 
 def get_top_k_frequencies(x: torch.Tensor, k: int, dim: int = -1) -> Tuple[torch.Tensor, torch.Tensor]:
