@@ -1,0 +1,41 @@
+model:
+  name: "spectral_ssm_ablation_compression"
+  d_model: 512
+  n_layer: 12
+  vocab_size: 50304
+  d_state: 64
+  d_conv: 4
+  expand: 2
+  compression_ratio: 0.25  # Varying parameter
+  use_adaptive_mask: true
+  use_spectral_norm: true
+  use_multi_scale: true
+  num_scales: 3
+  dropout: 0.1
+  max_seq_len: 2048
+
+training:
+  batch_size: 32
+  max_steps: 50000  # Shorter for ablation
+  learning_rate: 1e-4
+  weight_decay: 0.01
+  warmup_steps: 500
+  lr_decay_steps: 40000
+  use_amp: true
+
+data:
+  dataset_name: "lra"
+  task_name: "listops"
+  data_dir: "./data"
+
+logging:
+  save_dir: "./checkpoints/ablation_compression"
+  log_interval: 50
+  eval_interval: 500
+  save_interval: 2500
+  wandb_project: "spectral_ssm_ablation"
+  wandb_name: "compression_ratio_ablation"
+
+ablation:
+  parameter: "compression_ratio"
+  values: [0.25, 0.5, 0.75, 1.0]
