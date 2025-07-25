@@ -1,39 +1,66 @@
 """
-FFT Utilities for Spectral-Latent SSM
-Implements frequency domain operations for state compression
+FFT Utilities for Adaptive-Frequency-SSM
+Implements advanced frequency domain operations for state compression
 """
 
 import torch
 import torch.nn.functional as F
 import numpy as np
 from typing import Tuple, Optional
+from functools import wraps
+
+
+def preserve_dtype(func):
+    """Decorator to handle dtype conversion efficiently for FFT operations"""
+    @wraps(func)
+    def wrapper(x, *args, **kwargs):
+        original_dtype = x.dtype
+        needs_conversion = original_dtype == torch.bfloat16
+        
+        if needs_conversion:
+            x = x.float()
+        
+        result = func(x, *args, **kwargs)
+        
+        # For complex results, preserve higher precision
+        if needs_conversion and not result.dtype.is_complex:
+            result = result.to(torch.bfloat16)
+        
+        return result
+    return wrapper
+
+
+@preserve_dtype
+def _fft_core(x, operation, *args, **kwargs):
+    """Core FFT operation with consistent dtype handling"""
+    if operation == 'rfft':
+        return torch.fft.rfft(x, *args, **kwargs)
+    elif operation == 'irfft':
+        return torch.fft.irfft(x, *args, **kwargs)
+    elif operation == 'fft':
+        return torch.fft.fft(x, *args, **kwargs)
+    elif operation == 'ifft':
+        return torch.fft.ifft(x, *args, **kwargs)
+    else:
+        raise ValueError(f"Unknown FFT operation: {operation}")
 
 
 def real_fft(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
-    """Real FFT with proper normalization for spectral analysis"""
-    # Convert bfloat16 to float32 for FFT operations
-    if x.dtype == torch.bfloat16:
-        x = x.float()
-        result = torch.fft.rfft(x, dim=dim, norm='ortho')
-        return result.to(torch.bfloat16)
-    return torch.fft.rfft(x, dim=dim, norm='ortho')
+    """Real FFT with optimized dtype handling for spectral analysis"""
+    return _fft_core(x, 'rfft', dim=dim, norm='ortho')
 
 
 def real_ifft(x: torch.Tensor, n: Optional[int] = None, dim: int = -1) -> torch.Tensor:
-    """Inverse real FFT with proper normalization"""
-    # Convert bfloat16 to float32 for FFT operations
-    if x.dtype == torch.bfloat16:
-        x = x.float()
-        result = torch.fft.irfft(x, n=n, dim=dim, norm='ortho')
-        return result.to(torch.bfloat16)
-    return torch.fft.irfft(x, n=n, dim=dim, norm='ortho')
+    """Inverse real FFT with optimized dtype handling"""
+    return _fft_core(x, 'irfft', n=n, dim=dim, norm='ortho')
 
 
 def dct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
-    """Discrete Cosine Transform using FFT implementation"""
-    # Convert bfloat16 to float32 for FFT operations
+    """Discrete Cosine Transform using efficient FFT implementation"""
     original_dtype = x.dtype
-    if x.dtype == torch.bfloat16:
+    needs_conversion = original_dtype == torch.bfloat16
+    
+    if needs_conversion:
         x = x.float()
     
     N = x.size(dim)
@@ -55,16 +82,17 @@ def dct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
         X = X * W
     
     result = X.real
-    if original_dtype == torch.bfloat16:
+    if needs_conversion:
         result = result.to(torch.bfloat16)
     return result
 
 
 def idct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
-    """Inverse Discrete Cosine Transform"""
-    # Convert bfloat16 to float32 for FFT operations
+    """Inverse Discrete Cosine Transform with optimized precision handling"""
     original_dtype = x.dtype
-    if x.dtype == torch.bfloat16:
+    needs_conversion = original_dtype == torch.bfloat16
+    
+    if needs_conversion:
         x = x.float()
     
     N = x.size(dim)
@@ -95,23 +123,23 @@ def idct(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     
     result = torch.fft.ifft(X_ext, dim=dim).real
     result = result.narrow(dim, 0, N) * 2
-    if original_dtype == torch.bfloat16:
+    if needs_conversion:
         result = result.to(torch.bfloat16)
     return result
 
 
 def get_top_k_frequencies(x: torch.Tensor, k: int, dim: int = -1) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Get top-k frequency components based on magnitude
+    Extract the k most significant frequency components by magnitude.
     Returns: (top_k_values, indices)
     """
     freqs = real_fft(x, dim=dim)
     magnitudes = torch.abs(freqs)
     
-    # Get top-k indices
+    # Find the indices of the largest magnitude components
     _, indices = torch.topk(magnitudes, k, dim=dim)
     
-    # Gather top-k values
+    # Extract the corresponding frequency values
     top_k_freqs = torch.gather(freqs, dim, indices)
     
     return top_k_freqs, indices
@@ -119,8 +147,8 @@ def get_top_k_frequencies(x: torch.Tensor, k: int, dim: int = -1) -> Tuple[torch
 
 def slice_low_frequencies(x: torch.Tensor, k: int, dim: int = -1) -> torch.Tensor:
     """
-    Slice the first k low-frequency components after FFT
-    This is the main compression technique
+    Extract the first k low-frequency components after FFT.
+    This serves as our primary compression method.
     """
     freqs = real_fft(x, dim=dim)
     return freqs.narrow(dim, 0, k)
@@ -130,7 +158,7 @@ def pad_and_reconstruct(x_compressed: torch.Tensor, original_size: int, dim: int
     """
     Pad compressed frequencies and reconstruct signal
     """
-    # Create padded tensor
+    # Build the padded tensor for reconstruction
     pad_size = original_size // 2 + 1 - x_compressed.size(dim)  # rfft output size
     
     if pad_size > 0:
@@ -171,7 +199,7 @@ class AdaptiveFrequencyMask(torch.nn.Module):
         # Compute importance scores
         importance = torch.sigmoid(self.freq_weights / self.temperature.abs())
         
-        # Get top-k frequencies based on learned importance
+        # Select the most important frequencies using learned weights
         _, indices = torch.topk(importance, self.k)
         indices = indices.sort().values  # Keep frequency order
         
@@ -179,7 +207,7 @@ class AdaptiveFrequencyMask(torch.nn.Module):
         mask = torch.zeros_like(importance, dtype=torch.bool)
         mask[indices] = True
         
-        # Apply mask
+        # Extract the selected frequency components
         if dim == -1:
             compressed_freqs = freqs[..., mask]
         else:

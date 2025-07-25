@@ -26,10 +26,10 @@ import wandb
 from tqdm import tqdm
 import numpy as np
 
-from .models.spectral_ssm import (
-    SpectralSSM, 
-    SpectralSSMConfig, 
-    create_spectral_ssm_model
+from .models.adaptive_frequency_ssm import (
+    AdaptiveFrequencySSM, 
+    AdaptiveFrequencySSMConfig, 
+    create_adaptive_frequency_ssm_model
 )
 
 
@@ -38,7 +38,7 @@ class TrainingConfig:
     """Training configuration"""
     
     # Model parameters
-    model_name: str = "spectral_ssm_base"
+    model_name: str = "adaptive_frequency_ssm_base"
     d_model: int = 512
     n_layer: int = 12
     vocab_size: int = 50304
@@ -80,7 +80,7 @@ class TrainingConfig:
     log_interval: int = 100
     eval_interval: int = 1000
     save_interval: int = 5000
-    wandb_project: str = "spectral_ssm"
+    wandb_project: str = "adaptive_frequency_ssm"
     wandb_name: Optional[str] = None
     
     # Distributed training
@@ -183,7 +183,7 @@ class SpectralSSMTrainer:
                 project=self.config.wandb_project,
                 name=self.config.wandb_name,
                 config=asdict(self.config),
-                tags=["spectral_ssm", self.config.task_name]
+                tags=["adaptive_frequency_ssm", self.config.task_name]
             )
     
     def log_info(self, message: str):
@@ -202,7 +202,7 @@ class SpectralSSMTrainer:
             num_classes = None
         
         # Create model
-        model = create_spectral_ssm_model(
+        model = create_adaptive_frequency_ssm_model(
             task=task,
             d_model=self.config.d_model,
             n_layer=self.config.n_layer,
@@ -583,7 +583,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train Spectral SSM")
     
     # Model arguments
-    parser.add_argument("--model_name", type=str, default="spectral_ssm_base")
+    parser.add_argument("--model_name", type=str, default="adaptive_frequency_ssm_base")
     parser.add_argument("--d_model", type=int, default=512)
     parser.add_argument("--n_layer", type=int, default=12)
     parser.add_argument("--compression_ratio", type=float, default=0.5)
@@ -602,7 +602,7 @@ def main():
     
     # System arguments
     parser.add_argument("--save_dir", type=str, default="./checkpoints")
-    parser.add_argument("--wandb_project", type=str, default="spectral_ssm")
+    parser.add_argument("--wandb_project", type=str, default="adaptive_frequency_ssm")
     parser.add_argument("--wandb_name", type=str, default=None)
     parser.add_argument("--device", type=str, default="cuda")
     

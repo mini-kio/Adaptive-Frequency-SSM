@@ -1,6 +1,6 @@
 """
-Spectral-Latent SSM: Main Model Architecture
-S6-based State Space Model with Frequency Domain Compression
+Adaptive-Frequency-SSM: Main Model Architecture
+S6-based State Space Model with Advanced Frequency Domain Compression
 """
 
 import torch
@@ -11,14 +11,14 @@ from typing import Optional, Tuple, Dict, Any
 from einops import rearrange
 
 from .layers import (
-    SpectralS6Block, 
-    SpectralResidualBlock, 
-    MultiHeadSpectralAttention
+    AdaptiveFrequencyS6Block, 
+    AdaptiveFrequencyResidualBlock, 
+    MultiHeadAdaptiveFrequencyAttention
 )
 
 
-class SpectralSSMConfig:
-    """Configuration class for Spectral SSM"""
+class AdaptiveFrequencySSMConfig:
+    """Configuration class for Adaptive Frequency SSM"""
     
     def __init__(
         self,
@@ -101,13 +101,13 @@ class SpectralSSMConfig:
             setattr(self, key, value)
 
 
-class SpectralSSMBackbone(nn.Module):
+class AdaptiveFrequencySSMBackbone(nn.Module):
     """
     Spectral SSM Backbone Model
     Can be used for various tasks by adding appropriate heads
     """
     
-    def __init__(self, config: SpectralSSMConfig, device=None, dtype=None):
+    def __init__(self, config: AdaptiveFrequencySSMConfig, device=None, dtype=None):
         super().__init__()
         
         self.config = config
@@ -142,7 +142,7 @@ class SpectralSSMBackbone(nn.Module):
                 )
             elif config.use_multi_scale:
                 # Use residual block with multi-scale processing
-                layer = SpectralResidualBlock(
+                layer = AdaptiveFrequencyResidualBlock(
                     d_model=config.d_model,
                     d_state=config.d_state,
                     d_conv=config.d_conv,
@@ -164,7 +164,7 @@ class SpectralSSMBackbone(nn.Module):
                 )
             else:
                 # Standard spectral S6 block
-                layer = SpectralS6Block(
+                layer = AdaptiveFrequencyS6Block(
                     d_model=config.d_model,
                     d_state=config.d_state,
                     d_conv=config.d_conv,
@@ -251,12 +251,12 @@ class SpectralSSMBackbone(nn.Module):
         }
 
 
-class SpectralSSMForSequenceClassification(nn.Module):
+class AdaptiveFrequencySSMForSequenceClassification(nn.Module):
     """
     Spectral SSM for sequence classification tasks
     """
     
-    def __init__(self, config: SpectralSSMConfig, device=None, dtype=None):
+    def __init__(self, config: AdaptiveFrequencySSMConfig, device=None, dtype=None):
         super().__init__()
         
         self.config = config
@@ -264,7 +264,7 @@ class SpectralSSMForSequenceClassification(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         
         # Backbone
-        self.backbone = SpectralSSMBackbone(config, device, dtype)
+        self.backbone = AdaptiveFrequencySSMBackbone(config, device, dtype)
         
         # Classification head
         self.classifier = nn.Linear(
@@ -317,19 +317,19 @@ class SpectralSSMForSequenceClassification(nn.Module):
         return outputs
 
 
-class SpectralSSMForLanguageModeling(nn.Module):
+class AdaptiveFrequencySSMForLanguageModeling(nn.Module):
     """
     Spectral SSM for language modeling tasks
     """
     
-    def __init__(self, config: SpectralSSMConfig, device=None, dtype=None):
+    def __init__(self, config: AdaptiveFrequencySSMConfig, device=None, dtype=None):
         super().__init__()
         
         self.config = config
         factory_kwargs = {"device": device, "dtype": dtype}
         
         # Backbone
-        self.backbone = SpectralSSMBackbone(config, device, dtype)
+        self.backbone = AdaptiveFrequencySSMBackbone(config, device, dtype)
         
         # Language modeling head
         self.lm_head = nn.Linear(
@@ -381,7 +381,7 @@ class SpectralSSMForLanguageModeling(nn.Module):
         return outputs
 
 
-class SpectralSSM(nn.Module):
+class AdaptiveFrequencySSM(nn.Module):
     """
     Main Spectral SSM Model - unified interface
     """
@@ -393,12 +393,12 @@ class SpectralSSM(nn.Module):
         self.task = task
         
         if task == "classification":
-            self.model = SpectralSSMForSequenceClassification(config, device, dtype)
+            self.model = AdaptiveFrequencySSMForSequenceClassification(config, device, dtype)
         elif task == "language_modeling":
-            self.model = SpectralSSMForLanguageModeling(config, device, dtype)
+            self.model = AdaptiveFrequencySSMForLanguageModeling(config, device, dtype)
         else:
             # Default to backbone only
-            self.model = SpectralSSMBackbone(config, device, dtype)
+            self.model = AdaptiveFrequencySSMBackbone(config, device, dtype)
     
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
@@ -433,7 +433,7 @@ class SpectralSSM(nn.Module):
         return total_flops // seq_len  # Per token
 
 
-def create_spectral_ssm_model(
+def create_adaptive_frequency_ssm_model(
     task: str,
     d_model: int = 512,
     n_layer: int = 12,
@@ -441,9 +441,9 @@ def create_spectral_ssm_model(
     num_classes: Optional[int] = None,
     compression_ratio: float = 0.5,
     **kwargs
-) -> SpectralSSM:
+) -> AdaptiveFrequencySSM:
     """
-    Factory function to create SpectralSSM models
+    Factory function to create AdaptiveFrequencySSM models
     
     Args:
         task: One of ["classification", "language_modeling", "backbone"]
@@ -455,9 +455,9 @@ def create_spectral_ssm_model(
         **kwargs: Additional config parameters
     
     Returns:
-        SpectralSSM model
+        AdaptiveFrequencySSM model
     """
-    config = SpectralSSMConfig(
+    config = AdaptiveFrequencySSMConfig(
         d_model=d_model,
         n_layer=n_layer,
         vocab_size=vocab_size,
@@ -466,4 +466,4 @@ def create_spectral_ssm_model(
         **kwargs
     )
     
-    return SpectralSSM(config, task=task)
+    return AdaptiveFrequencySSM(config, task=task)

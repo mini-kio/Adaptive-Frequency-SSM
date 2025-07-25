@@ -1,5 +1,5 @@
 model:
-  name: "spectral_ssm_base"
+  name: "adaptive_frequency_ssm_base"
   d_model: 512
   n_layer: 12
   vocab_size: 50304
@@ -42,7 +42,7 @@ logging:
   log_interval: 100
   eval_interval: 1000
   save_interval: 5000
-  wandb_project: "spectral_ssm"
+  wandb_project: "adaptive_frequency_ssm"
   wandb_name: null
 
 system:

@@ -1,6 +1,6 @@
 """
-Spectral-Latent SSM Layers based on S6 Architecture
-Implements frequency domain state compression with S6 improvements
+Adaptive-Frequency-SSM Layers based on S6 Architecture
+Implements advanced frequency domain state compression with S6 improvements
 """
 
 import torch
@@ -20,7 +20,7 @@ from ..utils.fft_utils import (
 )
 
 
-class SpectralS6Block(nn.Module):
+class AdaptiveFrequencyS6Block(nn.Module):
     """
     S6-based Spectral-Latent SSM Block with frequency domain compression
     
@@ -169,7 +169,7 @@ class SpectralS6Block(nn.Module):
         x = self.act(x)
         
         # SSM computation with spectral compression
-        y = self.spectral_ssm(x)
+        y = self.adaptive_frequency_ssm(x)
         
         # Gating mechanism
         z = self.act(z)
@@ -179,7 +179,7 @@ class SpectralS6Block(nn.Module):
         output = self.out_proj(y)
         return output
     
-    def spectral_ssm(self, u):
+    def adaptive_frequency_ssm(self, u):
         """
         Spectral SSM computation with frequency domain compression
         
@@ -199,12 +199,12 @@ class SpectralS6Block(nn.Module):
         # Spectral domain processing
         if self.training and hasattr(self, 'freq_mask') and self.freq_mask is not None:
             # Use adaptive frequency masking during training
-            return self.spectral_ssm_adaptive(deltaA, deltaB_u, C, u)
+            return self.adaptive_frequency_ssm_adaptive(deltaA, deltaB_u, C, u)
         else:
             # Use fixed compression ratio
-            return self.spectral_ssm_fixed(deltaA, deltaB_u, C, u)
+            return self.adaptive_frequency_ssm_fixed(deltaA, deltaB_u, C, u)
     
-    def spectral_ssm_adaptive(self, deltaA, deltaB_u, C, u):
+    def adaptive_frequency_ssm_adaptive(self, deltaA, deltaB_u, C, u):
         """SSM with adaptive frequency selection"""
         batch, seqlen, d_inner, d_state = deltaA.shape
         
@@ -234,7 +234,7 @@ class SpectralS6Block(nn.Module):
         
         return y
     
-    def spectral_ssm_fixed(self, deltaA, deltaB_u, C, u):
+    def adaptive_frequency_ssm_fixed(self, deltaA, deltaB_u, C, u):
         """SSM with fixed compression ratio"""
         batch, seqlen, d_inner, d_state = deltaA.shape
         
@@ -256,30 +256,123 @@ class SpectralS6Block(nn.Module):
     
     def parallel_scan_spectral(self, A, B):
         """
-        Parallel scan in spectral domain with improved numerical stability
-        """
-        # Implementation of parallel scan for spectral domain
-        # This is a simplified version - full implementation would use
-        # more sophisticated parallel scan algorithms
+        Efficient parallel scan implementation using associative operations.
+        Processes linear recurrence h[t] = A[t] * h[t-1] + B[t] in parallel.
         
+        Args:
+            A: (batch, seqlen, d_inner, d_state) transition matrices
+            B: (batch, seqlen, d_inner, d_state) input terms
+            
+        Returns:
+            x: (batch, seqlen, d_inner, d_state) scanned states
+        """
         batch, seqlen, d_inner, d_state = A.shape
         
-        # Initialize state list to avoid in-place operations
-        x_list = []
-        h = torch.zeros(batch, d_inner, d_state, device=A.device, dtype=A.dtype)
+        # Use optimized implementation based on sequence length
+        if seqlen <= 1024:
+            return self._parallel_scan_associative(A, B)
+        else:
+            return self._parallel_scan_segmented(A, B, segment_size=1024)
+    
+    def _parallel_scan_associative(self, A, B):
+        """Associative parallel scan using 2x2 matrix representation"""
+        batch, seqlen, d_inner, d_state = A.shape
         
-        # Sequential scan without in-place operations
-        for i in range(seqlen):
-            if i == 0:
-                h = B[:, i].clone()
-            else:
-                h = A[:, i] * h + B[:, i]
-            x_list.append(h.unsqueeze(1))
+        # Convert to associative matrix form: [h[t], 1] = M[t] @ [h[t-1], 1]
+        # where M[t] = [[A[t], B[t]], [0, 1]]
+        matrices = torch.zeros(batch, seqlen, d_inner, d_state, 2, 2, 
+                              dtype=A.dtype, device=A.device)
+        matrices[..., 0, 0] = A  # Transition component
+        matrices[..., 0, 1] = B  # Input component  
+        matrices[..., 1, 1] = 1.0  # Identity for augmented dimension
         
-        # Concatenate all states
-        x = torch.cat(x_list, dim=1)  # (batch, seqlen, d_inner, d_state)
+        # Parallel prefix scan using tree reduction
+        result_matrices = self._associative_scan(matrices)
         
-        return x
+        # Extract the accumulated B terms (states)
+        return result_matrices[..., 0, 1]  # Shape: (batch, seqlen, d_inner, d_state)
+    
+    def _associative_scan(self, matrices):
+        """Tree-based associative scan implementation"""
+        batch, seqlen, d_inner, d_state, _, _ = matrices.shape
+        
+        # Pad to next power of 2 for efficient tree operations
+        padded_len = 2 ** math.ceil(math.log2(seqlen)) if seqlen > 1 else 1
+        if padded_len > seqlen:
+            # Pad with identity matrices
+            padding = torch.zeros(batch, padded_len - seqlen, d_inner, d_state, 2, 2,
+                                dtype=matrices.dtype, device=matrices.device)
+            padding[..., 0, 0] = 1.0  # A = I
+            padding[..., 1, 1] = 1.0  # Identity
+            matrices = torch.cat([matrices, padding], dim=1)
+        
+        # Up-sweep phase: build reduction tree
+        for step in range(int(math.log2(padded_len))):
+            stride = 2 ** (step + 1)
+            indices = torch.arange(stride - 1, padded_len, stride, device=matrices.device)
+            
+            if len(indices) > 0:
+                left_idx = indices - stride // 2
+                right_idx = indices
+                
+                # Matrix multiplication: matrices[right] = matrices[right] @ matrices[left]
+                matrices[:, right_idx] = torch.matmul(
+                    matrices[:, right_idx], 
+                    matrices[:, left_idx]
+                )
+        
+        # Down-sweep phase: distribute accumulated values
+        # Set root to identity
+        matrices[:, padded_len - 1, :, :, 0, 0] = 1.0
+        matrices[:, padded_len - 1, :, :, 0, 1] = 0.0
+        
+        for step in range(int(math.log2(padded_len)) - 1, -1, -1):
+            stride = 2 ** (step + 1)
+            indices = torch.arange(stride - 1, padded_len, stride, device=matrices.device)
+            
+            if len(indices) > 0:
+                left_idx = indices - stride // 2
+                right_idx = indices
+                
+                # Save right nodes
+                temp = matrices[:, right_idx].clone()
+                
+                # Move parent to right child
+                matrices[:, right_idx] = matrices[:, left_idx].clone()
+                
+                # Update left child
+                matrices[:, left_idx] = torch.matmul(temp, matrices[:, left_idx])
+        
+        # Return only the original sequence length
+        return matrices[:, :seqlen]
+    
+    def _parallel_scan_segmented(self, A, B, segment_size=1024):
+        """Memory-efficient segmented parallel scan for long sequences"""
+        batch, seqlen, d_inner, d_state = A.shape
+        
+        segments = []
+        running_state = torch.zeros(batch, d_inner, d_state, 
+                                   dtype=A.dtype, device=A.device)
+        
+        for i in range(0, seqlen, segment_size):
+            end_idx = min(i + segment_size, seqlen)
+            
+            # Process segment
+            A_seg = A[:, i:end_idx]
+            B_seg = B[:, i:end_idx].clone()
+            
+            # Incorporate running state into first element
+            if i > 0:
+                B_seg[:, 0] = A_seg[:, 0] * running_state + B_seg[:, 0]
+            
+            # Apply parallel scan to segment
+            segment_result = self._parallel_scan_associative(A_seg, B_seg)
+            segments.append(segment_result)
+            
+            # Update running state for next segment
+            running_state = segment_result[:, -1]
+        
+        return torch.cat(segments, dim=1)
     
     def get_ssm_params(self, u):
         """Get SSM parameters following S6 design"""
@@ -299,7 +392,7 @@ class SpectralS6Block(nn.Module):
         return dt, B, C
 
 
-class SpectralResidualBlock(nn.Module):
+class AdaptiveFrequencyResidualBlock(nn.Module):
     """
     Residual block with spectral processing for multi-scale information
     """
@@ -351,7 +444,7 @@ class SpectralResidualBlock(nn.Module):
         return x
 
 
-class MultiHeadSpectralAttention(nn.Module):
+class MultiHeadAdaptiveFrequencyAttention(nn.Module):
     """
     Multi-head attention with spectral processing
     Can be used alongside spectral SSM for hybrid architectures

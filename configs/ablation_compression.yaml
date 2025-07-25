@@ -1,5 +1,5 @@
 model:
-  name: "spectral_ssm_ablation_compression"
+  name: "adaptive_frequency_ssm_ablation_compression"
   d_model: 512
   n_layer: 12
   vocab_size: 50304
@@ -33,7 +33,7 @@ logging:
   log_interval: 50
   eval_interval: 500
   save_interval: 2500
-  wandb_project: "spectral_ssm_ablation"
+  wandb_project: "adaptive_frequency_ssm_ablation"
   wandb_name: "compression_ratio_ablation"
 
 ablation:

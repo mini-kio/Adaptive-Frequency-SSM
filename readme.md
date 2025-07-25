@@ -1,10 +1,10 @@
-# Spectral-Latent SSM
+# Adaptive-Frequency-SSM
 
-An implementation of **Spectral-Latent State Space Models** with frequency domain compression, based on the S6 architecture. This model aims to enable efficient long sequence modeling through spectral domain state compression techniques.
+An implementation of **Adaptive-Frequency State Space Models** with advanced frequency domain compression, based on the S6 architecture. This model aims to enable efficient long sequence modeling through spectral domain state compression techniques.
 
 ## About
 
-Spectral-Latent SSM implements frequency domain compression for state space models, aiming for efficient processing of long sequences while maintaining performance. Key features include:
+Adaptive-Frequency-SSM implements advanced frequency domain compression for state space models, aiming for efficient processing of long sequences while maintaining performance. Key features include:
 
 - **Frequency Domain State Compression**: Compresses state representations in the spectral domain
 - **Adaptive Frequency Selection**: Learns which frequency components are most important
@@ -33,8 +33,8 @@ Spectral-Latent SSM implements frequency domain compression for state space mode
 ### Install from Source
 
 ```bash
-git clone https://github.com/mini-kio/spectral-ssm.git
-cd spectral-ssm
+git clone https://github.com/mini-kio/adaptive-frequency-ssm.git
+cd adaptive-frequency-ssm
 pip install -e .
 ```
 
@@ -58,10 +58,10 @@ pip install -e ".[dev]"
 ### Quick Start
 
 ```python
-from spectral-ssm import SpectralSSM, SpectralSSMConfig
+from adaptive_frequency_ssm import AdaptiveFrequencySSM, AdaptiveFrequencySSMConfig
 
 # Create model configuration
-config = SpectralSSMConfig(
+config = AdaptiveFrequencySSMConfig(
     d_model=512,
     n_layer=12,
     vocab_size=50304,
@@ -70,7 +70,7 @@ config = SpectralSSMConfig(
 )
 
 # Initialize model
-model = SpectralSSM(config, task="classification")
+model = AdaptiveFrequencySSM(config, task="classification")
 
 # Forward pass
 input_ids = torch.randint(0, 1000, (32, 2048))  # (batch, seq_len)
@@ -82,7 +82,7 @@ outputs = model(input_ids=input_ids)
 #### Single GPU Training
 
 ```bash
-python -m spectral-ssm.train \
+python -m adaptive_frequency_ssm.train \
     --task_name listops \
     --d_model 512 \
     --n_layer 12 \
@@ -109,7 +109,7 @@ torchrun --nproc_per_node=4 -m spectral-ssm.train \
 #### Configuration File Training
 
 ```bash
-python -m spectral-ssm.train --config configs/base_config.yaml
+python -m adaptive_frequency_ssm.train --config configs/base_config.yaml
 ```
 
 ### Evaluation
@@ -117,7 +117,7 @@ python -m spectral-ssm.train --config configs/base_config.yaml
 #### LRA Benchmark Evaluation
 
 ```bash
-python -m spectral-ssm.evaluation \
+python -m adaptive_frequency_ssm.evaluation \
     --checkpoint_path ./checkpoints/best_model.pt \
     --data_dir ./data \
     --output_dir ./evaluation_results \
@@ -129,7 +129,7 @@ python -m spectral-ssm.evaluation \
 #### Performance Analysis
 
 ```bash
-python -m spectral-ssm.evaluation \
+python -m adaptive_frequency_ssm.evaluation \
     --checkpoint_path ./checkpoints/best_model.pt \
     --profile_layers \
     --compression_ratios 0.25 0.5 0.75 1.0
@@ -149,7 +149,7 @@ python scripts/aggregate_lra_results.py \
 
 ```yaml
 model:
-  name: "spectral-ssm_base"
+  name: "adaptive_frequency_ssm_base"
   d_model: 512
   n_layer: 12
   vocab_size: 50304
@@ -192,9 +192,9 @@ training:
 
 ### Core Components
 
-1. **SpectralS6Block**: Main building block with frequency domain compression
+1. **AdaptiveFrequencyS6Block**: Main building block with frequency domain compression
 2. **AdaptiveFrequencyMask**: Learnable frequency component selection
-3. **SpectralResidualBlock**: Residual connections with multi-scale processing
+3. **AdaptiveFrequencyResidualBlock**: Residual connections with multi-scale processing
 4. **CirculantMatrix**: Efficient frequency domain operations
 
 ### Frequency Domain Compression
@@ -219,7 +219,7 @@ The model includes comprehensive evaluation tools for the Long Range Arena (LRA)
 Use the evaluation script to test performance on these benchmarks:
 
 ```bash
-python -m spectral-ssm.evaluation \
+python -m adaptive_frequency_ssm.evaluation \
     --checkpoint_path ./checkpoints/best_model.pt \
     --tasks listops text retrieval pathfinder
 ```
@@ -232,7 +232,7 @@ The model supports testing different compression ratios to find optimal performa
 
 ```python
 # Test different compression ratios
-python -m spectral-ssm.evaluation \
+python -m adaptive_frequency_ssm.evaluation \
     --checkpoint_path ./checkpoints/best_model.pt \
     --compression_ratios 0.1 0.25 0.5 0.75 1.0
 ```
@@ -250,9 +250,9 @@ The architecture includes several optional components that can be evaluated:
 ### Custom Model Creation
 
 ```python
-from spectral-ssm.models import create_spectral-ssm_model
+from adaptive_frequency_ssm.models import create_adaptive_frequency_ssm_model
 
-model = create_spectral-ssm_model(
+model = create_adaptive_frequency_ssm_model(
     task="classification",
     d_model=768,
     n_layer=24,
@@ -265,7 +265,7 @@ model = create_spectral-ssm_model(
 ### Hybrid Attention Mode
 
 ```python
-config = SpectralSSMConfig(
+config = AdaptiveFrequencySSMConfig(
     d_model=512,
     n_layer=12,
     use_hybrid_attention=True,
@@ -276,7 +276,7 @@ config = SpectralSSMConfig(
 ### Custom Frequency Analysis
 
 ```python
-from spectral-ssm.utils.fft_utils import (
+from adaptive_frequency_ssm.utils.fft_utils import (
     slice_low_frequencies,
     AdaptiveFrequencyMask,
     multi_scale_fft
@@ -306,11 +306,11 @@ compressed_freqs, selection_mask = freq_mask(hidden_states)
 ## Citation
 
 ```bibtex
-@misc{spectral-ssm2024,
-  title={Spectral-Latent SSM: Frequency Domain State Space Models},
+@misc{adaptive-frequency-ssm2024,
+  title={Adaptive-Frequency-SSM: Advanced Frequency Domain State Space Models},
   author={mini-kio},
   year={2024},
-  howpublished={\url{https://github.com/mini-kio/spectral-ssm}}
+  howpublished={\url{https://github.com/mini-kio/adaptive-frequency-ssm}}
 }
 ```
 

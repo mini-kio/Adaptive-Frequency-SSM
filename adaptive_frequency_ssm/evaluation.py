@@ -22,7 +22,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from .models.spectral_ssm import SpectralSSM, SpectralSSMConfig
+from .models.adaptive_frequency_ssm import AdaptiveFrequencySSM, AdaptiveFrequencySSMConfig
 from .data.lra_datasets import create_lra_dataloader, LRABenchmark
 from .train import TrainingConfig
 
@@ -337,9 +337,9 @@ class SpectralSSMEvaluator:
             model_config = checkpoint.get('config', {})
         
         # Create model
-        from .models.spectral_ssm import create_spectral_ssm_model
+        from .models.adaptive_frequency_ssm import create_adaptive_frequency_ssm_model
         
-        model = create_spectral_ssm_model(**model_config)
+        model = create_adaptive_frequency_ssm_model(**model_config)
         
         # Load state dict
         if 'model_state_dict' in checkpoint:

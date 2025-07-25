@@ -1,5 +1,5 @@
 """
-Setup script for Spectral-Latent SSM
+Setup script for Adaptive-Frequency-SSM
 """
 
 from setuptools import setup, find_packages
@@ -8,14 +8,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="spectral-ssm",
+    name="adaptive-frequency-ssm",
     version="0.1.0",
     author="Research Team",
     author_email="research@example.com",
-    description="Spectral-Latent SSM: Frequency Domain State Space Models",
+    description="Adaptive-Frequency-SSM: Advanced Frequency Domain State Space Models",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/research/spectral-ssm",
+    url="https://github.com/research/adaptive-frequency-ssm",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -63,12 +63,12 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "spectral-ssm-train=spectral_ssm.train:main",
-            "spectral-ssm-eval=spectral_ssm.evaluation:main",
+            "adaptive-frequency-ssm-train=adaptive_frequency_ssm.train:main",
+            "adaptive-frequency-ssm-eval=adaptive_frequency_ssm.evaluation:main",
         ],
     },
     package_data={
-        "spectral_ssm": ["configs/*.yaml", "configs/*.json"],
+        "adaptive_frequency_ssm": ["configs/*.yaml", "configs/*.json"],
     },
     include_package_data=True,
     zip_safe=False,
